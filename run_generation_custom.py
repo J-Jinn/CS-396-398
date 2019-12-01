@@ -299,6 +299,7 @@ def prediction_generation(context_tokens, generated, prediction_option):
                 print(f"\n###############################################################################")
                 print(f"Note: The '#' at the beginning and end delimit the start and end of the text.")
                 print(f"Original (excluding text prediction) raw text string: {tokenizer.decode(context_tokens)}\n")
+                counter = 0
                 for gen in generated_array:
                     out = gen
                     if output_debug:
@@ -316,7 +317,10 @@ def prediction_generation(context_tokens, generated, prediction_option):
                         # Decode - convert from token ID's back into English words.
                         text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
                         #     text = text[: text.find(args.stop_token) if args.stop_token else None]
+                        print(f"Prediction {counter} of {int(k_value - 1)} for this iteration based on previous "
+                              f"iterations' randomly selected tokens (using RNG).")
                         print(f"Predicted (excluding original raw input text) text string: #{text}#")
+                    counter += 1
                 print(f"###############################################################################\n")
 
             ############################################################################################
@@ -401,8 +405,8 @@ def prediction_generation(context_tokens, generated, prediction_option):
                     print(f"topk word score shape after un-squeezing: {elements.unsqueeze(0).unsqueeze(0).shape}")
                 counter += 1
 
-
 #########################################################################################
+
 
 def main():
     """
