@@ -73,10 +73,9 @@ More Notes:
 #########################################################################################
 #########################################################################################
 
-import torch  # PyTorch.
-import sys # For sys.exit.
-
 # Import required packages and libraries.
+import torch  # PyTorch.
+import pandas as pd # Pandas.
 from tqdm import trange  # Instantly make your loops show a smart progress meter.
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
@@ -89,7 +88,6 @@ tokenizer = tokenizer_class.from_pretrained('gpt2')  # Use pre-trained model.
 model = model_class.from_pretrained('gpt2')  # User pre-trained model.
 model.to('cpu')  # Specifies what machine to run the model on.
 model.eval()  # Specifies that the model is NOT in training mode.
-
 
 #########################################################################################
 
@@ -199,7 +197,7 @@ def prediction_generation(context_tokens, generated, prediction_option):
 
             if temperature == "exit" or iterations == "exit" or k_value == "exit":
                 print(f"Terminating program...")
-                quit()
+                quit(0)
 
             try:
                 if float(temperature) > 0.0 and int(iterations) > 0 and int(k_value) > 0:
@@ -211,10 +209,12 @@ def prediction_generation(context_tokens, generated, prediction_option):
 
     generated_array = []  # List of "generated" PyTorch Tensor containing encoded word tokens.
     token_score_array = []  # List of "scores" for each token in the current iteration of topk greedy sampling.
+    alternative_route = []  # List containing the alternative choices we could have made.
 
     logits_debug = False
     topk_debug = False
     output_debug = False
+    alternative_debug = False
 
     # Create list of PyTorch Tensors containing encoded original raw text string.
     # Create a list of word token score values initially set to 1.0.
@@ -224,10 +224,20 @@ def prediction_generation(context_tokens, generated, prediction_option):
 
     chosen_generated = generated_array[0]  # For initial iteration.
 
+    # Setup for displaying alternative routes.
+    for element in range(0, int(k_value)):
+        alternative_route.append(tokenizer.decode(context_tokens))
+    if alternative_debug:
+        print(f"")
+        for element in alternative_route:
+            print(f"Contents of alternative_route nested lists: {element}")
+
     ############################################################################################
 
     with torch.no_grad():  # This specifies not to use stochastic gradient descent!
         for _ in trange(int(iterations)):
+
+            ############################################################################################
 
             # Note: Feeding the results back into the model is the beginnings of a beam search algorithm.
             # Currently, randomly chooses one of the "generated" Tensors to feed back in.
@@ -283,38 +293,38 @@ def prediction_generation(context_tokens, generated, prediction_option):
 
                     counter += 1
 
-                    ############################################################################################
+                ############################################################################################
 
-                    # Output the text prediction results.
-                    print(f"Original raw text string: {tokenizer.decode(context_tokens)}\n")
-                    for gen in generated_array:
-                        out = gen
-                        if output_debug:
-                            print(f"Contents of 'out': {out}")
+                # Output the text prediction results.
+                print(f"\n###############################################################################")
+                print(f"Note: The '#' at the beginning and end delimit the start and end of the text.")
+                print(f"Original (excluding text prediction) raw text string: {tokenizer.decode(context_tokens)}\n")
+                for gen in generated_array:
+                    out = gen
+                    if output_debug:
+                        print(f"Contents of 'out': {out}")
 
-                        # This line removes the original text but keeps appending the generated words one-by-one
-                        # (based on iteration length).
-                        out = out[:, len(context_tokens):].tolist()
-                        if output_debug:
-                            print(f"Contents of 'out' after .tolist(): {out}\n")
-                            print(f"Length of context tokens:{len(context_tokens)}\n")
+                    # This line removes the original text but keeps appending the generated words one-by-one
+                    # (based on iteration length).
+                    out = out[:, len(context_tokens):].tolist()
+                    if output_debug:
+                        print(f"Contents of 'out' after .tolist(): {out}\n")
+                        print(f"Length of context tokens:{len(context_tokens)}\n")
 
-                        # Outputs the result of the text modeling and prediction.
-                        for o in out:
-                            # Decode - convert from token ID's back into English words.
-                            text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
-                            #     text = text[: text.find(args.stop_token) if args.stop_token else None]
-                            print(f"###############################################################################")
-                            print(f"Note: The '#' at the beginning and end delimit the start and end of the text.")
-                            print(f"Predicted text: #{text}#")
-                            print(f"###############################################################################")
+                    # Outputs the result of the text modeling and prediction.
+                    for o in out:
+                        # Decode - convert from token ID's back into English words.
+                        text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
+                        #     text = text[: text.find(args.stop_token) if args.stop_token else None]
+                        print(f"Predicted (excluding original raw input text) text string: #{text}#")
+                print(f"###############################################################################\n")
 
             ############################################################################################
 
             if prediction_option == "interactive":
                 chosen = False
                 while not chosen:
-                    print(f"\nEnter 'exit' or 'Exit' to terminate the program.")
+                    print(f"\nEnter 'exit program' or 'Exit Program' to terminate the program.")
                     print(f"The top k={k_value} tokens are:")
                     print(f"Note: The '#' are there to delimit the start and end of the token since tokens "
                           f"can include '\\n' and other invisible characters.")
@@ -322,12 +332,16 @@ def prediction_generation(context_tokens, generated, prediction_option):
                     counter = 0
                     for elements in my_topk.indices[0]:
                         print(f"Token {counter}: #{tokenizer.decode(elements.unsqueeze(0).tolist())}#")
+                        # print(f"{type(tokenizer.decode(elements.unsqueeze(0).tolist()))}")
+                        alternative_route[counter] = alternative_route[counter] + tokenizer.decode(
+                            elements.unsqueeze(0).tolist())
+                        counter += 1
 
                     choose_token = input(f"\nChoose a token to use for the next iteration of text prediction:")
 
-                    if choose_token == "exit" or choose_token == "Exit":
+                    if choose_token == "exit program" or choose_token == "Exit Program":
                         print(f"Terminating program...")
-                        quit()
+                        quit(0)
 
                     for elements in my_topk.indices[0]:
                         if choose_token == str(tokenizer.decode(elements.unsqueeze(0).tolist())):
@@ -339,7 +353,14 @@ def prediction_generation(context_tokens, generated, prediction_option):
                 ############################################################################################
 
                 # Output the text prediction results.
-                print(f"Original raw text string: {tokenizer.decode(context_tokens)}\n")
+                print(f"\n###############################################################################")
+                print(f"Original (excluding text prediction) raw text string: {tokenizer.decode(context_tokens)}\n")
+
+                print(f"All routes that user could have made in choosing a token from the current iteration:")
+                counter = 0
+                for i in range(0, int(k_value)):
+                    print(f"Route {counter}: {alternative_route[counter]}")
+                    counter += 1
 
                 out = chosen_generated
                 if output_debug:
@@ -357,10 +378,16 @@ def prediction_generation(context_tokens, generated, prediction_option):
                     # Decode - convert from token ID's back into English words.
                     text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
                     #     text = text[: text.find(args.stop_token) if args.stop_token else None]
-                    print(f"###############################################################################")
                     print(f"Note: The '#' at the beginning and end delimit the start and end of the text.")
-                    print(f"Predicted text: #{text}#")
-                    print(f"###############################################################################")
+                    print(f"Predicted (excluding original raw input text) text string: #{text}#")
+                    print(f"###############################################################################\n")
+
+            # Updated setup for displaying alternative routes based on each iteration's chosen token.
+            # This essentially means we display alternative routes based on the previously chosen token(s).
+            counter = 0
+            for element in range(0, int(k_value)):
+                alternative_route[counter] = (tokenizer.decode(context_tokens) + text)
+                counter += 1
 
             ############################################################################################
 
