@@ -1,3 +1,9 @@
+# CS-396 Senior Projects I
+
+## Project Title: Transformers (tentative)
+### Mentor: Professor Kenneth Arnold
+### Student: Joseph Jinn
+
 ## Welcome to GitHub Pages
 
 You can use the [editor on GitHub](https://github.com/J-Jinn/CS-396-398/edit/master/README.md) to maintain and preview the content for your website in Markdown files.
