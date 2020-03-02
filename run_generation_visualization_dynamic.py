@@ -339,10 +339,12 @@ def prediction_generation(context_tokens, generated, prediction_option):
         print(f"All token options list stored in dictionary {token_options_all_lists}")
 
     # Return the original string and predicted text following it, as well as all the possible options.
+    print([complete_string, token_options_all_lists])
     return [complete_string, token_options_all_lists]
 
 
 #########################################################################################
+
 
 # noinspection DuplicatedCode
 def main(user_input_string):
