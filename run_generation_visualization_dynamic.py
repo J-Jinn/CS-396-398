@@ -112,7 +112,7 @@ def extract_top_k_tokens(filtered_logits, k_value):
     Return:
         my_topk - top "k" word tokens as Tensors.
     """
-    topk_debug = True
+    topk_debug = False
 
     # Return the top "k" most likely (highest score value) words in sorted order..
     my_topk = torch.topk(filtered_logits, k=k_value, dim=1, sorted=True)
@@ -183,9 +183,10 @@ def prediction_generation(context_tokens, generated, prediction_option):
     alternative_route = []  # List containing the alternative choices we could have made.
 
     logits_debug = False
-    topk_debug = True
+    topk_debug = False
     output_debug = False
     alternative_debug = False
+    json_debug = True
 
     # Create list of PyTorch Tensors containing encoded original raw text string.
     # Create a list of word token score values initially set to 1.0.
@@ -212,6 +213,9 @@ def prediction_generation(context_tokens, generated, prediction_option):
     with torch.no_grad():  # This specifies not to use stochastic gradient descent!
         for _ in trange(int(iterations)):
 
+            # Data structure to store all tokens for each iteration.
+            token_options_list = []
+
             # Note: Feeding the results back into the model is the beginnings of a beam search algorithm.
             # Currently, randomly chooses one of the "generated" Tensors to feed back in.
             if logits_debug:
@@ -219,8 +223,24 @@ def prediction_generation(context_tokens, generated, prediction_option):
                 print(f"Generated array element 0 shape: {generated_array[0]}")
                 print(f"token_score_array element 0 shape: {token_score_array[0]}\n")
 
-            if prediction_option == "auto":
-                chosen_generated = generated_array[random.randint(0, int(k_value) - 1)]
+            # if prediction_option == "auto":
+
+            # Randomly select the previously generated text to use to predict the next word token(s).
+            chosen_generated = generated_array[random.randint(0, int(k_value) - 1)]
+            if logits_debug:
+                print(f"Chosen generated: {chosen_generated}")
+
+            # FIXME - should be using as key the token chosen, not he previous token...
+            # Append each list of token for each iteration of predictions.
+            chosen_generated_to_list = chosen_generated[0].tolist()
+            chosen_generated_to_list_last_element = chosen_generated_to_list[len(chosen_generated_to_list) - 1]
+            chosen_generated_to_list_last_element_decoded = tokenizer.decode(chosen_generated_to_list_last_element)
+            token_options_all_lists[chosen_generated_to_list_last_element_decoded] = token_options_list
+
+            if json_debug:
+                print(f"chosen generated to list: {chosen_generated_to_list}")
+                print(f"chosen generated to list last element: {chosen_generated_to_list_last_element}")
+                print(f"chosen generated to list last element decoded: {chosen_generated_to_list_last_element_decoded}")
 
             # Call to GPT2 model generates a Tensor object containing "scores" for the entire vocabulary.
             outputs = model(input_ids=chosen_generated)
@@ -240,8 +260,8 @@ def prediction_generation(context_tokens, generated, prediction_option):
             # Call function to extract the top "k" word tokens based on their scores.
             my_topk = extract_top_k_tokens(filtered_logits, int(k_value))
 
-            # Data structure to store all tokens for each iteration.
-            token_options_list = []
+            # # Data structure to store all tokens for each iteration.
+            # token_options_list = []
 
             if prediction_option == "auto":
                 # Ghetto looping through topk indices.
@@ -277,9 +297,12 @@ def prediction_generation(context_tokens, generated, prediction_option):
                 if topk_debug:
                     print(f"Token options list: {token_options_list}")
 
-                # Append each list of token for each iteration of predictions.
-                token_options_all_lists[iteration_counter] = token_options_list
                 iteration_counter += 1
+
+                # FIXME - need to add last chosen token and associated list of possibilities chosen from.
+                if (iteration_counter + 3) == iterations:
+                    # Append each list of token for each iteration of predictions.
+                    token_options_all_lists[iteration_counter] = token_options_list
 
                 ############################################################################################
 
@@ -335,7 +358,7 @@ def prediction_generation(context_tokens, generated, prediction_option):
                     print(f"topk word score shape after un-squeezing: {elements.unsqueeze(0).unsqueeze(0).shape}")
                 counter += 1
 
-    if topk_debug:
+    if json_debug:
         print(f"All token options list stored in dictionary {token_options_all_lists}")
 
     # Return the original string and predicted text following it, as well as all the possible options.
