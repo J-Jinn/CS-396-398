@@ -5,7 +5,7 @@ Advisor: Professor Kenneth Arnold
 Coordinator: Professor Keith VanderLinden
 Author: Joseph Jinn
 
-run_generation_custom.py defines and implements a bare-bones text modeling and prediction program using the GPT2
+run_generation_console_program.py defines and implements a bare-bones text modeling and prediction program using the GPT2
     model and tokenizer.
 
 #########################################################################################
@@ -178,6 +178,35 @@ def prediction_generation(context_tokens, generated, prediction_option):
     iterations = 20  # Default value.
     k_value = 3  # Top "k" words to choose.
 
+    if prediction_option == "interactive":
+        valid = False
+        while not valid:
+            print(f"\nNote: To terminate the program, enter 'exit' for any of the requested inputs.  "
+                  f"Once all inputs have received a value, the program will then terminate.")
+
+            print(f"\nNote: Temperature is a hyper-parameter of LSTMs (and neural networks generally) used to control "
+                  f"the randomness of predictions by scaling the logits before applying softmax.")
+            temperature = input(f"Set temperature value to (real number > 0): ")
+
+            print(f"\nNote: This controls how many iterations to generate the top 'k' most likely word tokens based on "
+                  f"the preceding token, which controls the # of word tokens the predicted text will consist of.")
+            iterations = input(f"Set the number of text prediction iterations for current string to: (integer > 0): ")
+
+            print(f"\nNote: This controls the # of tokens returned by the torch.topk() greedy sampling function.")
+            k_value = input(f"Enter the 'k' value for top 'k' most likely word token generation (integer > 0): ")
+
+            if temperature == "exit" or iterations == "exit" or k_value == "exit":
+                print(f"Terminating program...")
+                quit(0)
+
+            try:
+                if float(temperature) > 0.0 and int(iterations) > 0 and int(k_value) > 0:
+                    valid = True
+                else:
+                    print(f"Invalid value(s) detected! Please choose valid value(s)!\n")
+            except TypeError:
+                continue
+
     generated_array = []  # List of "generated" PyTorch Tensor containing encoded word tokens.
     token_score_array = []  # List of "scores" for each token in the current iteration of topk greedy sampling.
     alternative_route = []  # List containing the alternative choices we could have made.
@@ -186,7 +215,6 @@ def prediction_generation(context_tokens, generated, prediction_option):
     topk_debug = False
     output_debug = False
     alternative_debug = False
-    json_debug = True
 
     # Create list of PyTorch Tensors containing encoded original raw text string.
     # Create a list of word token score values initially set to 1.0.
@@ -206,15 +234,10 @@ def prediction_generation(context_tokens, generated, prediction_option):
 
     ############################################################################################
 
-    # Data structure to store all token lists from every iteration.
-    token_options_all_lists = {}
-    iteration_counter = 0
-
     with torch.no_grad():  # This specifies not to use stochastic gradient descent!
         for _ in trange(int(iterations)):
 
-            # Data structure to store all tokens for each iteration.
-            token_options_list = []
+            ############################################################################################
 
             # Note: Feeding the results back into the model is the beginnings of a beam search algorithm.
             # Currently, randomly chooses one of the "generated" Tensors to feed back in.
@@ -223,24 +246,8 @@ def prediction_generation(context_tokens, generated, prediction_option):
                 print(f"Generated array element 0 shape: {generated_array[0]}")
                 print(f"token_score_array element 0 shape: {token_score_array[0]}\n")
 
-            # if prediction_option == "auto":
-
-            # Randomly select the previously generated text to use to predict the next word token(s).
-            chosen_generated = generated_array[random.randint(0, int(k_value) - 1)]
-            if logits_debug:
-                print(f"Chosen generated: {chosen_generated}")
-
-            # FIXME - should be using as key the token chosen, not he previous token...
-            # Append each list of token for each iteration of predictions.
-            chosen_generated_to_list = chosen_generated[0].tolist()
-            chosen_generated_to_list_last_element = chosen_generated_to_list[len(chosen_generated_to_list) - 1]
-            chosen_generated_to_list_last_element_decoded = tokenizer.decode(chosen_generated_to_list_last_element)
-            token_options_all_lists[chosen_generated_to_list_last_element_decoded] = token_options_list
-
-            if json_debug:
-                print(f"chosen generated to list: {chosen_generated_to_list}")
-                print(f"chosen generated to list last element: {chosen_generated_to_list_last_element}")
-                print(f"chosen generated to list last element decoded: {chosen_generated_to_list_last_element_decoded}")
+            if prediction_option == "auto":
+                chosen_generated = generated_array[random.randint(0, int(k_value) - 1)]
 
             # Call to GPT2 model generates a Tensor object containing "scores" for the entire vocabulary.
             outputs = model(input_ids=chosen_generated)
@@ -260,9 +267,6 @@ def prediction_generation(context_tokens, generated, prediction_option):
             # Call function to extract the top "k" word tokens based on their scores.
             my_topk = extract_top_k_tokens(filtered_logits, int(k_value))
 
-            # # Data structure to store all tokens for each iteration.
-            # token_options_list = []
-
             if prediction_option == "auto":
                 # Ghetto looping through topk indices.
                 counter = 0
@@ -277,12 +281,7 @@ def prediction_generation(context_tokens, generated, prediction_option):
                     if topk_debug:
                         print(f"Next token shape: {next_token.shape}")
                         print(f"Next token: {next_token}")
-                        print(f"Decoded next token(s): {tokenizer.decode(next_token.squeeze().tolist())}")
-                        print(f"Decoded next token(s) data type: "
-                              f"{type(tokenizer.decode(next_token.squeeze().tolist()))}\n")
-
-                    # Append each token to the list for the current iteration through the topk words.
-                    token_options_list.append(tokenizer.decode(next_token.squeeze().tolist()))
+                        print(f"Decoded next token(s): {tokenizer.decode(next_token.squeeze().tolist())}\n")
 
                     # Concatenate the chosen token (predicted word) to the end of the tokenized (encoded) string.
                     # Then, add to the array of "generated" PyTorch tensors by modifying the original generated.
@@ -293,16 +292,6 @@ def prediction_generation(context_tokens, generated, prediction_option):
                         print(f"Decoded 'generated' tokens: {tokenizer.decode(chosen_generated.squeeze().tolist())}\n")
 
                     counter += 1
-
-                if topk_debug:
-                    print(f"Token options list: {token_options_list}")
-
-                iteration_counter += 1
-
-                # FIXME - need to add last chosen token and associated list of possibilities chosen from.
-                if (iteration_counter + 3) == iterations:
-                    # Append each list of token for each iteration of predictions.
-                    token_options_all_lists[iteration_counter] = token_options_list
 
                 ############################################################################################
 
@@ -334,10 +323,68 @@ def prediction_generation(context_tokens, generated, prediction_option):
                     counter += 1
                 print(f"###############################################################################\n")
 
-                complete_string = f"{tokenizer.decode(context_tokens)}{text}"
-                print(f"Complete string: {complete_string}")
-
             ############################################################################################
+
+            if prediction_option == "interactive":
+                chosen = False
+                while not chosen:
+                    print(f"\nEnter 'exit program' or 'Exit Program' to terminate the program.")
+                    print(f"The top k={k_value} tokens are:")
+                    print(f"Note: The '#' are there to delimit the start and end of the token since tokens "
+                          f"can include '\\n' and other invisible characters.")
+                    print(f"Note: Type in the EXACT characters you see (or don't see), including whitespace, etc.\n")
+                    counter = 0
+                    for elements in my_topk.indices[0]:
+                        print(f"Token {counter}: #{tokenizer.decode(elements.unsqueeze(0).tolist())}#")
+                        # print(f"{type(tokenizer.decode(elements.unsqueeze(0).tolist()))}")
+                        alternative_route[counter] = alternative_route[counter] + tokenizer.decode(
+                            elements.unsqueeze(0).tolist())
+                        counter += 1
+
+                    choose_token = input(f"\nChoose a token to use for the next iteration of text prediction:")
+
+                    if choose_token == "exit program" or choose_token == "Exit Program":
+                        print(f"Terminating program...")
+                        quit(0)
+
+                    for elements in my_topk.indices[0]:
+                        if choose_token == str(tokenizer.decode(elements.unsqueeze(0).tolist())):
+                            next_token = elements.unsqueeze(0).unsqueeze(0)
+                            chosen_generated = (torch.cat((chosen_generated, next_token), dim=1))
+                            chosen = True
+                            break
+
+                ############################################################################################
+
+                # Output the text prediction results.
+                print(f"\n###############################################################################")
+                print(f"Original (excluding text prediction) raw text string: {tokenizer.decode(context_tokens)}\n")
+
+                print(f"All routes that user could have made in choosing a token from the current iteration:")
+                counter = 0
+                for i in range(0, int(k_value)):
+                    print(f"Route {counter}: {alternative_route[counter]}")
+                    counter += 1
+
+                out = chosen_generated
+                if output_debug:
+                    print(f"Contents of 'out': {out}")
+
+                # This line removes the original text but keeps appending the generated words one-by-one (based on
+                # iteration length).
+                out = out[:, len(context_tokens):].tolist()
+                if output_debug:
+                    print(f"Contents of 'out' after .tolist(): {out}\n")
+                    print(f"Length of context tokens:{len(context_tokens)}\n")
+
+                # Outputs the result of the text modeling and prediction.
+                for o in out:
+                    # Decode - convert from token ID's back into English words.
+                    text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
+                    #     text = text[: text.find(args.stop_token) if args.stop_token else None]
+                    print(f"Note: The '#' at the beginning and end delimit the start and end of the text.")
+                    print(f"Predicted (excluding original raw input text) text string: #{text}#")
+                    print(f"###############################################################################\n")
 
             # Updated setup for displaying alternative routes based on each iteration's chosen token.
             # This essentially means we display alternative routes based on the previously chosen token(s).
@@ -358,65 +405,89 @@ def prediction_generation(context_tokens, generated, prediction_option):
                     print(f"topk word score shape after un-squeezing: {elements.unsqueeze(0).unsqueeze(0).shape}")
                 counter += 1
 
-    if json_debug:
-        print(f"All token options list stored in dictionary {token_options_all_lists}")
-
-    # Return the original string and predicted text following it, as well as all the possible options.
-    print([complete_string, token_options_all_lists])
-    return [complete_string, token_options_all_lists]
-
-
 #########################################################################################
 
 
-# noinspection DuplicatedCode
-def main(user_input_string):
+def main():
     """
     Main encodes the raw text string, wraps in PyTorch Tensor, and calls prediction_generation().
     Executes forever until user enters "exit" or "Exit".
 
-    Parameters: The user text input.
-    Return: The predicted text.
+    Parameters: None
+    Return: None
     """
     main_debug = False
     context_debug = False
     num_samples = 1  # Default value.
     user_option = "auto"
 
-    # Encode raw text.
-    context_tokens = tokenizer.encode(user_input_string, add_special_tokens=False)
-    if main_debug:
-        print(f"Raw text: {user_input_string}\n")
-        print(f"Context tokens: {context_tokens}\n")
+    print(f"Welcome to the GPT2 bare-bones run_generation.py test.")
+    print(f"Note: Enter 'exit' or 'Exit' to quit the program.")
 
-    context = context_tokens  # Set to name as in run_generation.py
+    print(f"Please choose between automated text prediction or interactive text prediction:\n"
+          f"Automated chooses default hard-coded settings and proceeds on its own.\n"
+          f"Interactive allows the user to choose the next token used in text prediction "
+          f"and adjust some other settings.\n")
 
-    # Convert to a PyTorch Tensor object (numpy array).
-    context = torch.tensor(context, dtype=torch.long, device='cpu')
-    if context_debug:
-        print(f"Context shape: {context.shape}")
-        print(f"Context converted to PyTorch Tensor object: {context}\n")
+    repeat_query = True
+    while repeat_query:
+        user_option = input(f"Type 'auto' or 'interactive'.")
 
-    # Un-squeeze adds a dimension to the Tensor array.
-    # Repeat adds x-dimensions and repeats the Tensor elements y-times.
-    context = context.unsqueeze(0).repeat(num_samples, 1)
-    if context_debug:
-        print(f"Context shape after 'un-squeeze': {context.shape}")
-        print(f"Context after 'un-squeeze': {context}\n")
+        if user_option == "exit" or user_option == "Exit":
+            return
+        elif user_option != "auto" and user_option != "interactive":
+            repeat_query = True
+            print(f"Unrecognized option - type 'auto' or 'interactive'!")
+        else:
+            repeat_query = False
 
-    generated = context  # Set to name as in run_generation.py
+    ############################################################################################
 
-    # Generate and output text prediction results.
-    return prediction_generation(context_tokens, generated, user_option)
+    while True:
+        raw_text = ""
+        while len(raw_text) == 0:
+            raw_text = input("Enter a string: ")
+            if len(raw_text) == 0:
+                print(f"Please enter something that is NOT a empty string!")
+
+        # Quit the program.
+        if raw_text == "exit" or raw_text == "Exit":
+            print(f"Terminating program execution.")
+            break
+
+        # Encode raw text.
+        context_tokens = tokenizer.encode(raw_text, add_special_tokens=False)
+        if main_debug:
+            print(f"Raw text: {raw_text}\n")
+            print(f"Context tokens: {context_tokens}\n")
+
+        context = context_tokens  # Set to name as in run_generation.py
+
+        # Convert to a PyTorch Tensor object (numpy array).
+        context = torch.tensor(context, dtype=torch.long, device='cpu')
+        if context_debug:
+            print(f"Context shape: {context.shape}")
+            print(f"Context converted to PyTorch Tensor object: {context}\n")
+
+        # Un-squeeze adds a dimension to the Tensor array.
+        # Repeat adds x-dimensions and repeats the Tensor elements y-times.
+        context = context.unsqueeze(0).repeat(num_samples, 1)
+        if context_debug:
+            print(f"Context shape after 'un-squeeze': {context.shape}")
+            print(f"Context after 'un-squeeze': {context}\n")
+
+        generated = context  # Set to name as in run_generation.py
+
+        # Generate and output text prediction results.
+        prediction_generation(context_tokens, generated, user_option)
+        print(f"Iterations for current string has ended.  Will request user enter new string.\n")
 
 
 #########################################################################################
 
 # Execute the program.
 # Select below and Run with "Alt + Shift + E" to avoid re-running entire fire and re-loading model every-time.
-# Note: you need to run the entire code-base at least once with Alt + Shift + E to have everything in memory.
-# Note: anytime you make changes to any function, need to re-run entire function for the changes to implement.
 if __name__ == '__main__':
-    main("Hello")
+    main()
 
 ############################################################################################
