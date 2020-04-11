@@ -94,36 +94,29 @@ def prediction_generation(context_tokens, generated):
     Return:
         [complete_string, token_options_all_lists] - list containing entire prediction and choice of tokens per word.
     """
-    temperature = 1  # Default value.
-    iterations = 20  # Default value.
-    k_value = 3  # Top "k" words to choose.
-
-    generated_array = []  # List of "generated" PyTorch Tensor containing encoded word tokens.
-    token_score_array = []  # List of "scores" for each token in the current iteration of topk greedy sampling.
+    temperature = 1  # Value to scale logits by.
+    iterations = 20  # Controls how many words are in the prediction.
+    k_value = 3  # Top "k" words to choose from per token.
+    token_options_all_lists = {} # Data structure to store all token lists from every iteration.
+    token_options_list = []     # Data structure to store all tokens for each iteration.
 
     logits_debug = False
     topk_debug = False
     output_debug = True
     json_debug = True
 
-    # Create list of PyTorch Tensors containing encoded original raw text string.
-    # Create a list of word token score values initially set to 1.0.
+    generated_array = []  # List of "generated" PyTorch Tensor containing encoded word tokens.
+    token_score_array = []  # List of "scores" for each token in the current iteration of topk greedy sampling.
     for i in range(0, int(k_value)):
+        # Create list of PyTorch Tensors containing encoded original raw text string.
+        # Create a list of word token score values initially set to 1.0.
         generated_array.append(generated)
         token_score_array.append(1.)
 
     ############################################################################################
 
-    # Data structure to store all token lists from every iteration.
-    token_options_all_lists = {}
-
-    # Data structure to store all tokens for each iteration.
-    token_options_list = []
-
-    iteration_counter = 0
-
     with torch.no_grad():  # This specifies not to use stochastic gradient descent!
-        for increment in trange(int(iterations)):
+        for _ in trange(int(iterations)):
 
             # Note: Feeding the results back into the model is the beginnings of a beam search algorithm.
             # Currently, randomly chooses one of the "generated" Tensors to feed back in.
@@ -198,8 +191,6 @@ def prediction_generation(context_tokens, generated):
             if topk_debug:
                 print(f"Token options list: {token_options_list}")
 
-            iteration_counter += 1
-
             # if increment > 0:
             #     token_options_all_lists[chosen_generated_to_list_last_element_decoded] = token_options_list
             #     print(f"All token options list stored in dictionary {token_options_all_lists}")
@@ -257,8 +248,6 @@ def prediction_generation(context_tokens, generated):
                     print(f"topk word score shape after un-squeezing: {elements.unsqueeze(0).unsqueeze(0).shape}")
                 counter += 1
 
-    # print(f"All token options list stored in dictionary {token_options_all_lists}")
-
     # Return the original string and predicted text following it, as well as all the possible options.
     print([complete_string, token_options_all_lists])
     return [complete_string, token_options_all_lists]
@@ -269,10 +258,8 @@ def prediction_generation(context_tokens, generated):
 def main(user_input_string):
     """
     Main encodes the raw text string, wraps in PyTorch Tensor, and calls prediction_generation().
-    Executes forever until user enters "exit" or "Exit".
-
     Parameters: The user text input.
-    Return: The predicted text.
+    Return: Text prediction and associated tokens per word in text.
     """
     num_samples = 1  # Default value.
     # user_input_string = ['hello', 'I', 'am']
@@ -280,24 +267,19 @@ def main(user_input_string):
 
     # Encode raw text.
     context_tokens = tokenizer.encode(user_input_string, add_special_tokens=False)
-
     # print(f"context tokens encoded: {context_tokens}")
     # print(f"context tokens decoded: {tokenizer.decode(context_tokens)}")
     # return
 
-    context = context_tokens  # Set to name as in run_generation.py
-
     # Convert to a PyTorch Tensor object (numpy array).
-    context = torch.tensor(context, dtype=torch.long, device='cpu')
+    context = torch.tensor(context_tokens, dtype=torch.long, device='cpu')
 
     # Un-squeeze adds a dimension to the Tensor array.
     # Repeat adds x-dimensions and repeats the Tensor elements y-times.
     context = context.unsqueeze(0).repeat(num_samples, 1)
 
-    generated = context  # Set to name as in run_generation.py
-
     # Generate and output text prediction results.
-    return prediction_generation(context_tokens, generated)
+    return prediction_generation(context_tokens, context)
 
 
 #########################################################################################
