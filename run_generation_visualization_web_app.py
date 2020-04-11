@@ -320,9 +320,15 @@ def main(user_input_string):
     Return: The predicted text.
     """
     num_samples = 1  # Default value.
+    # user_input_string = ['hello', 'I', 'am']
+    # user_input_string = "hello I am"
 
     # Encode raw text.
     context_tokens = tokenizer.encode(user_input_string, add_special_tokens=False)
+
+    # print(f"context tokens encoded: {context_tokens}")
+    # print(f"context tokens decoded: {tokenizer.decode(context_tokens)}")
+    # return
 
     context = context_tokens  # Set to name as in run_generation.py
 
