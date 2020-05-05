@@ -52,13 +52,12 @@ More Notes:
 
 # Import required packages and libraries.
 import torch  # PyTorch.
-import pandas as pd # Pandas.
+import pandas as pd  # Pandas.
 import random  # Random number generator.
 from tqdm import trange  # Instantly make your loops show a smart progress meter.
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 
 #########################################################################################
-# FIXME - need to associate chosen tokens for predicted sentence with token selected choice dictionary.
 # Load the GPT2-model.
 model_class = GPT2LMHeadModel  # Specifies the model to use.
 tokenizer_class = GPT2Tokenizer  # Specifies the tokenizer to use for the model.
@@ -66,6 +65,7 @@ tokenizer = tokenizer_class.from_pretrained('gpt2')  # Use pre-trained model.
 model = model_class.from_pretrained('gpt2')  # User pre-trained model.
 model.to('cpu')  # Specifies what machine to run the model on.
 model.eval()  # Specifies that the model is NOT in training mode.
+
 
 #########################################################################################
 
@@ -97,11 +97,11 @@ def prediction_generation(context_tokens, generated):
     temperature = 1  # Value to scale logits by.
     iterations = 20  # Controls how many words are in the prediction.
     k_value = 3  # Top "k" words to choose from per token.
-    token_options_all_lists = {} # Data structure to store all token lists from every iteration.
-    token_options_list = []     # Data structure to store all tokens for each iteration.
+    token_options_all_lists = []  # Data structure to store all token lists from every iteration.
+    token_options_list = []  # Data structure to store all tokens for each iteration.
 
-    logits_debug = False
-    topk_debug = False
+    logits_debug = True
+    topk_debug = True
     output_debug = True
     json_debug = True
 
@@ -125,17 +125,18 @@ def prediction_generation(context_tokens, generated):
                 print(f"token_score_array element 0 shape: {token_score_array[0]}\n")
 
             # Randomly select the previously generated text to use to predict the next word token(s).
-            chosen_generated = generated_array[random.randint(0, int(k_value) - 1)]
-            # chosen_generated = generated_array[k_value - 1]
+            # FIXME - associate randomized "generated" with correct chosen tokens from token choice lists.
+            random.seed(1)  # Make our pesudo-randomness predictable...
+            my_random = random.randint(0, int(k_value) - 1)
+            chosen_generated = generated_array[my_random]
+            # chosen_generated = generated_array[0]
             if logits_debug:
                 print(f"Chosen generated: {chosen_generated}")
 
-            # Append each list of token for each iteration of predictions.
-            chosen_generated_to_list = chosen_generated[0].tolist()
-            chosen_generated_to_list_last_element = chosen_generated_to_list[len(chosen_generated_to_list) - 1]
-            chosen_generated_to_list_last_element_decoded = tokenizer.decode(chosen_generated_to_list_last_element)
-
             if json_debug:
+                chosen_generated_to_list = chosen_generated[0].tolist()
+                chosen_generated_to_list_last_element = chosen_generated_to_list[len(chosen_generated_to_list) - 1]
+                chosen_generated_to_list_last_element_decoded = tokenizer.decode(chosen_generated_to_list_last_element)
                 print(f"chosen generated to list: {chosen_generated_to_list}")
                 print(f"chosen generated to list last element: {chosen_generated_to_list_last_element}")
                 print(f"chosen generated to list last element decoded: {chosen_generated_to_list_last_element_decoded}")
@@ -200,38 +201,72 @@ def prediction_generation(context_tokens, generated):
             # Output the text prediction results.
             print(f"\n###############################################################################")
             print(f"Note: The '#' at the beginning and end delimit the start and end of the text.")
-            print(f"Original (excluding text prediction) raw text string: {tokenizer.decode(context_tokens)}\n")
             counter = 0
-            for gen in generated_array:
-                out = gen
-                if output_debug:
-                    print(f"Contents of 'out': {out}")
+            # Loop through and display all choices for each iteration of predictions.
+            # for gen in generated_array:
+            #     out = gen
+            #     if output_debug:
+            #         print(f"Contents of 'out': {out}")
+            #
+            #     # This line removes the original text but keeps appending the generated words one-by-one
+            #     # (based on iteration length).
+            #     out = out[:, len(context_tokens):].tolist()
+            #     if output_debug:
+            #         print(f"Contents of 'out' after .tolist(): {out}")
+            #         print(f"Length of context tokens:{len(context_tokens)}")
+            #         test = out[0][-1]
+            #         print(f"test: {test}")
+            #         print(f"Decoded test: {tokenizer.decode(test)}")
+            #         print(f"Decoded out: {tokenizer.decode(out[0])}")
+            #
+            #     # Outputs the result of the text modeling and prediction.
+            #     for o in out:
+            #         # Decode - convert from token ID's back into English words.
+            #         text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
+            #         #     text = text[: text.find(args.stop_token) if args.stop_token else None]
+            #         print(f"Prediction {counter} of {int(k_value - 1)} for this iteration based on previous "
+            #               f"iterations' randomly selected tokens (using RNG).")
+            #         print(f"Original (excluding text prediction) raw text string: "
+            #               f"#{tokenizer.decode(context_tokens)}#\n")
+            #         print(f"Predicted (excluding original raw input text) text string: #{text}#")
+            #     counter += 1
 
-                # This line removes the original text but keeps appending the generated words one-by-one
-                # (based on iteration length).
-                out = out[:, len(context_tokens):].tolist()
-                if output_debug:
-                    print(f"Contents of 'out' after .tolist(): {out}")
-                    print(f"Length of context tokens:{len(context_tokens)}")
-                    test = out[0][-1]
-                    print(f"test: {test}")
-                    print(f"Decoded test: {tokenizer.decode(test)}")
-                    print(f"Decoded out: {tokenizer.decode(out[0])}")
+            ############################################################################################
 
-                # Outputs the result of the text modeling and prediction.
-                for o in out:
-                    # Decode - convert from token ID's back into English words.
-                    text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
-                    #     text = text[: text.find(args.stop_token) if args.stop_token else None]
-                    print(f"Prediction {counter} of {int(k_value - 1)} for this iteration based on previous "
-                          f"iterations' randomly selected tokens (using RNG).")
-                    print(f"Predicted (excluding original raw input text) text string: #{text}#")
-                counter += 1
+            # Just output the selected token for the current iteration.
+            out = generated_array[my_random]
+            if output_debug:
+                print(f"Contents of 'out': {out}")
+
+            # This line removes the original text but keeps appending the generated words one-by-one
+            # (based on iteration length).
+            out = out[:, len(context_tokens):].tolist()
+            if output_debug:
+                print(f"Contents of 'out' after .tolist(): {out}")
+                print(f"Length of context tokens:{len(context_tokens)}")
+                test = out[0][-1]
+                print(f"test: {test}")
+                print(f"Decoded test: {tokenizer.decode(test)}")
+                print(f"Decoded out: {tokenizer.decode(out[0])}")
+
+            # Outputs the result of the text modeling and prediction.
+            for o in out:
+                # Decode - convert from token ID's back into English words.
+                text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
+                #     text = text[: text.find(args.stop_token) if args.stop_token else None]
+                print(f"Prediction {counter} of {int(k_value - 1)} for this iteration based on previous "
+                      f"iterations' randomly selected tokens (using RNG).")
+                print(f"Original (excluding text prediction) raw text string: "
+                      f"#{tokenizer.decode(context_tokens)}#\n")
+                print(f"Predicted (excluding original raw input text) text string: #{text}#")
             print(f"###############################################################################\n")
+
+            ############################################################################################
 
             # Store chosen token and associated choices of tokens for each iteration.
             select = tokenizer.decode(out[0][-1], clean_up_tokenization_spaces=True)
-            token_options_all_lists[str(select)] = token_options_list
+            # token_options_all_lists[str(select)] = token_options_list
+            token_options_all_lists.append([select, token_options_list])
             print(f"All token options list stored in dictionary {token_options_all_lists}")
             token_options_list = []
 
