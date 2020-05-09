@@ -100,10 +100,10 @@ def prediction_generation(context_tokens, generated):
     token_options_all_lists = []  # Data structure to store all token lists from every iteration.
     token_options_list = []  # Data structure to store all tokens for each iteration.
 
-    logits_debug = True
-    topk_debug = True
-    output_debug = True
-    json_debug = True
+    logits_debug = False
+    topk_debug = False
+    output_debug = False
+    json_debug = False
 
     generated_array = []  # List of "generated" PyTorch Tensor containing encoded word tokens.
     token_score_array = []  # List of "scores" for each token in the current iteration of topk greedy sampling.
@@ -199,8 +199,8 @@ def prediction_generation(context_tokens, generated):
             ############################################################################################
 
             # Output the text prediction results.
-            print(f"\n###############################################################################")
-            print(f"Note: The '#' at the beginning and end delimit the start and end of the text.")
+            # print(f"\n###############################################################################")
+            # print(f"Note: The '#' at the beginning and end delimit the start and end of the text.")
             counter = 0
             # Loop through and display all choices for each iteration of predictions.
             # for gen in generated_array:
@@ -254,12 +254,12 @@ def prediction_generation(context_tokens, generated):
                 # Decode - convert from token ID's back into English words.
                 text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
                 #     text = text[: text.find(args.stop_token) if args.stop_token else None]
-                print(f"Prediction {counter} of {int(k_value - 1)} for this iteration based on previous "
-                      f"iterations' randomly selected tokens (using RNG).")
-                print(f"Original (excluding text prediction) raw text string: "
-                      f"#{tokenizer.decode(context_tokens)}#\n")
-                print(f"Predicted (excluding original raw input text) text string: #{text}#")
-            print(f"###############################################################################\n")
+            #     print(f"Prediction {counter} of {int(k_value - 1)} for this iteration based on previous "
+            #           f"iterations' randomly selected tokens (using RNG).")
+            #     print(f"Original (excluding text prediction) raw text string: "
+            #           f"#{tokenizer.decode(context_tokens)}#\n")
+            #     print(f"Predicted (excluding original raw input text) text string: #{text}#")
+            # print(f"###############################################################################\n")
 
             ############################################################################################
 
@@ -267,11 +267,13 @@ def prediction_generation(context_tokens, generated):
             select = tokenizer.decode(out[0][-1], clean_up_tokenization_spaces=True)
             # token_options_all_lists[str(select)] = token_options_list
             token_options_all_lists.append([select, token_options_list])
-            print(f"All token options list stored in dictionary {token_options_all_lists}")
             token_options_list = []
 
             complete_string = f"{tokenizer.decode(context_tokens)}{text}"
-            print(f"Complete string: {complete_string}")
+
+            if output_debug:
+                print(f"All token options list stored in dictionary {token_options_all_lists}")
+                print(f"Complete string: {complete_string}")
 
             # Store the scores for each token.
             counter = 0
